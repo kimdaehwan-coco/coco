@@ -1,0 +1,8 @@
+requests>=2.31
+beautifulsoup4>=4.12
+lxml>=5.0
+pandas>=2.2
+openpyxl>=3.1
+# 표 선택 기본값(selection_default)·가로 컨테이너를 쓰므로 1.67 이상
+streamlit>=1.67
+python-dotenv>=1.0

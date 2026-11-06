@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+.env
+.claude/
+.streamlit/secrets.toml
+# 내려받은 결과 파일
+*.xlsx
+*.csv

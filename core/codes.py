@@ -37,7 +37,7 @@ JOB_CATEGORIES: dict[str, dict] = {
                      "개발리드", "개발 리드", "테크리드", "tech lead", "개발팀장", "개발 팀장"],
         "title_only": True,
     },
-    # ── 추가 웹 직무 (기본은 선택 안 됨, 화면에서 골라 쓰기) ──
+    # ── 추가 웹 직무 (풀스택·Java·Spring은 기본 선택, 나머지는 화면에서 골라 쓰기) ──
     "풀스택 개발자": {
         "queries": ["풀스택"],
         "keywords": ["풀스택", "풀 스택", "full-stack", "fullstack", "full stack"],
@@ -66,8 +66,9 @@ JOB_CATEGORIES: dict[str, dict] = {
         "title_only": True,
     },
 }
-# 처음 화면에서 미리 선택해 둘 직무 (처음 요청한 6개)
-DEFAULT_JOB_CATEGORIES = ["백엔드 개발자", "프론트엔드 개발자", "웹개발자", "DA", "웹사이트 운영", "개발PL"]
+# 처음 화면에서 미리 선택해 둘 직무 (처음 요청한 6개 + 풀스택·Java·Spring)
+DEFAULT_JOB_CATEGORIES = ["백엔드 개발자", "프론트엔드 개발자", "웹개발자", "DA", "웹사이트 운영", "개발PL",
+                          "풀스택 개발자", "Java·Spring 개발자"]
 
 # ── 지역 ──────────────────────────────────────────────────────────────
 # aliases: 공고의 근무지 문자열에서 이 지역을 알아보는 단어

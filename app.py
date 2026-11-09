@@ -145,7 +145,7 @@ with st.container(border=True, key="search_card"):
     j1, j2 = st.columns([3, 2])
     jobs = j1.multiselect("직무",
                           list(JOB_CATEGORIES), default=DEFAULT_JOB_CATEGORIES,
-                          help="목록을 펼치면 풀스택·웹퍼블리셔·Java/Spring·PHP·Node.js·웹기획자도 고를 수 있습니다. "
+                          help="목록을 펼치면 웹퍼블리셔·PHP·Node.js·웹기획자도 고를 수 있습니다. "
                                "직무를 많이 고를수록 검색이 오래 걸립니다.")
     sites = j2.multiselect("검색 사이트", SITES, default=SITES)
 

@@ -93,6 +93,43 @@ def section(title: str, note: str = "") -> None:
     st.markdown(f'<div class="fj-section">{title}<span>{note}</span></div>', unsafe_allow_html=True)
 
 
+# ── 제외 단어·업체: 파일에서 읽어 세션에 목록으로 들고 있고, 바뀔 때마다 바로 파일에 저장한다 ──
+if "ex_titles" not in st.session_state:
+    st.session_state["ex_titles"] = parse_exclude_list(
+        load_list(EXCLUDE_TITLE_FILE, "\n".join(DEFAULT_EXCLUDE_TITLE_KEYWORDS)))
+if "ex_companies" not in st.session_state:
+    st.session_state["ex_companies"] = parse_exclude_list(load_list(EXCLUDE_FILE))
+
+
+def _save_excludes(key: str, path: Path) -> None:
+    save_list(path, "\n".join(st.session_state[key]))
+
+
+def _add_bulk(key: str, path: Path) -> None:
+    """붙여넣은 여러 개(쉼표·줄바꿈 구분)를 목록에 더한다. 이미 있는 것(대소문자 무시)은 건너뛴다."""
+    have = {v.lower() for v in st.session_state[key]}
+    new = [v for v in dict.fromkeys(parse_exclude_list(st.session_state[f"{key}_bulk"])) if v.lower() not in have]
+    st.session_state[key] = st.session_state[key] + new
+    st.session_state[f"{key}_bulk"] = ""
+    _save_excludes(key, path)
+
+
+def _reset(key: str, path: Path, values: list[str]) -> None:
+    st.session_state[key] = list(values)
+    _save_excludes(key, path)
+
+
+def exclude_editor(key: str, path: Path, label: str, help_text: str, reset_to: list[str] | None = None) -> None:
+    # 태그 입력: 칸에 글자를 치고 Enter 로 하나씩 추가, 태그의 × 로 삭제
+    st.multiselect(label, options=st.session_state[key], key=key, accept_new_options=True,
+                   placeholder="입력 후 Enter 로 추가", help=help_text, on_change=_save_excludes, args=(key, path))
+    st.text_input("여러 개 한 번에 추가", key=f"{key}_bulk", placeholder="쉼표로 구분해 붙여넣고 Enter",
+                  on_change=_add_bulk, args=(key, path), label_visibility="collapsed")
+    if reset_to is not None:
+        st.button("기본값으로 되돌리기", key=f"{key}_reset", on_click=_reset, args=(key, path, reset_to),
+                  type="tertiary", icon=":material/restart_alt:")
+
+
 with st.container(border=True, key="search_card"):
     section("검색 조건", "경력은 '경력' 공고만 찾습니다 (신입·신입/경력·경력무관 제외)")
     today = today_kst()  # 클라우드 서버는 UTC 라서 한국 날짜로 맞춘다
@@ -112,17 +149,23 @@ with st.container(border=True, key="search_card"):
                                "직무를 많이 고를수록 검색이 오래 걸립니다.")
     sites = j2.multiselect("검색 사이트", SITES, default=SITES)
 
-    # 3줄: 제외 조건 · 페이지 수 · 검색 버튼
-    e1, e2, e3 = st.columns([3, 3, 2])
-    exclude_title_text = e1.text_area(
-        "제외할 직무 단어 (공고 제목 기준)",
-        value=load_list(EXCLUDE_TITLE_FILE, ", ".join(DEFAULT_EXCLUDE_TITLE_KEYWORDS)), height=90,
-        help="공고 제목에 이 단어가 있으면 뺍니다. 띄어쓰기·대소문자는 무시합니다. 비우면 이 필터를 쓰지 않습니다.")
-    exclude_text = e2.text_area("제외할 업체 (쉼표나 줄바꿈으로 구분)", value=load_list(EXCLUDE_FILE), height=90,
-                                help="(주), ㈜, 주식회사, 띄어쓰기는 무시하고 이름 일부만 맞아도 제외합니다.")
-    max_pages = e3.slider("검색어별 최대 페이지 수", 1, 10, 5,
+    # 3줄: 제외 설정(팝업) · 페이지 수 · 검색 버튼
+    # 제외 단어·업체는 자주 보는 정보가 아니라서 '제외 설정' 버튼 안에 넣고, 태그처럼 하나씩 넣고 빼게 한다.
+    e1, e2, e3 = st.columns([2, 2, 1.3], vertical_alignment="bottom")
+    n_titles, n_companies = len(st.session_state["ex_titles"]), len(st.session_state["ex_companies"])
+    with e1.popover(f"제외 설정 · 단어 {n_titles}개 · 업체 {n_companies}개", icon=":material/block:",
+                    width="stretch"):
+        exclude_editor("ex_titles", EXCLUDE_TITLE_FILE, "제외할 직무 단어 (공고 제목 기준)",
+                       "공고 제목에 이 단어가 있으면 뺍니다. 띄어쓰기·대소문자는 무시합니다. 모두 지우면 이 필터를 쓰지 않습니다.",
+                       reset_to=DEFAULT_EXCLUDE_TITLE_KEYWORDS)
+        st.divider()
+        exclude_editor("ex_companies", EXCLUDE_FILE, "제외할 업체",
+                       "(주), ㈜, 주식회사, 띄어쓰기는 무시하고 이름 일부만 맞아도 제외합니다.")
+    max_pages = e2.slider("검색어별 최대 페이지 수", 1, 10, 5,
                           help="기간을 길게 잡으면 늘려 주세요. 클수록 오래 걸립니다.")
     run = e3.button("검색", type="primary", width="stretch")
+    exclude_titles = list(st.session_state["ex_titles"])
+    exclude_companies = list(st.session_state["ex_companies"])
 
 if run:
     problems = []
@@ -136,12 +179,9 @@ if run:
             st.error(p)
         st.stop()
 
-    save_list(EXCLUDE_FILE, exclude_text)
-    save_list(EXCLUDE_TITLE_FILE, exclude_title_text)
     cond = SearchCondition(date_from=date_from, date_to=date_to, job_categories=jobs, regions=regions,
-                           employment_types=emps, sites=sites,
-                           exclude_companies=parse_exclude_list(exclude_text),
-                           exclude_title_keywords=parse_exclude_list(exclude_title_text), max_pages=max_pages)
+                           employment_types=emps, sites=sites, exclude_companies=exclude_companies,
+                           exclude_title_keywords=exclude_titles, max_pages=max_pages)
     with st.status("검색 중…", expanded=True) as status:
         lines: list[str] = []
         box = st.empty()

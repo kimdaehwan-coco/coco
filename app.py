@@ -19,12 +19,26 @@ from core.models import SearchCondition
 from core.search import run_search
 
 ROOT = Path(__file__).parent
+# 기본 목록: GitHub에 올라가는 원본. 앱이 실행 중에 이 파일을 고치지 않는다 (읽기만).
 EXCLUDE_FILE = ROOT / "config" / "exclude_companies.txt"
 EXCLUDE_TITLE_FILE = ROOT / "config" / "exclude_title_keywords.txt"
+# 화면에서 고친 목록은 따로 저장한다 (config/user/, GitHub에 올리지 않음).
+# 원본을 덮어쓰지 않으므로 잘못 저장돼도 '기본값으로 되돌리기'로 복구되고, 클라우드가 새 코드를 받을 때도 충돌이 없다.
+USER_DIR = ROOT / "config" / "user"
+USER_EXCLUDE_FILE = USER_DIR / "exclude_companies.txt"
+USER_EXCLUDE_TITLE_FILE = USER_DIR / "exclude_title_keywords.txt"
 
 
 def load_list(path: Path, default: str = "") -> str:
     return path.read_text(encoding="utf-8") if path.exists() else default
+
+
+def default_titles() -> list[str]:
+    return parse_exclude_list(load_list(EXCLUDE_TITLE_FILE, "\n".join(DEFAULT_EXCLUDE_TITLE_KEYWORDS)))
+
+
+def default_companies() -> list[str]:
+    return parse_exclude_list(load_list(EXCLUDE_FILE))
 
 
 def save_list(path: Path, text: str) -> None:
@@ -93,41 +107,53 @@ def section(title: str, note: str = "") -> None:
     st.markdown(f'<div class="fj-section">{title}<span>{note}</span></div>', unsafe_allow_html=True)
 
 
-# ── 제외 단어·업체: 파일에서 읽어 세션에 목록으로 들고 있고, 바뀔 때마다 바로 파일에 저장한다 ──
-if "ex_titles" not in st.session_state:
-    st.session_state["ex_titles"] = parse_exclude_list(
-        load_list(EXCLUDE_TITLE_FILE, "\n".join(DEFAULT_EXCLUDE_TITLE_KEYWORDS)))
-if "ex_companies" not in st.session_state:
-    st.session_state["ex_companies"] = parse_exclude_list(load_list(EXCLUDE_FILE))
+# ── 제외 단어·업체 ──
+# 목록 자체는 세션의 "ex_titles"/"ex_companies"에 두고, 태그 입력칸은 별도 키("…_w")를 쓴다.
+# 입력칸 상태가 어떤 이유로 비어도 목록은 남아 있게 하기 위해서다.
+# 처음 열 때: 화면에서 고친 파일(config/user/)이 있으면 그것을, 없으면 기본 목록(config/*.txt)을 쓴다.
+EXCLUDE_SOURCES = {
+    "ex_titles": (USER_EXCLUDE_TITLE_FILE, default_titles),
+    "ex_companies": (USER_EXCLUDE_FILE, default_companies),
+}
+for _key, (_user_file, _default) in EXCLUDE_SOURCES.items():
+    if _key not in st.session_state:
+        st.session_state[_key] = parse_exclude_list(load_list(_user_file)) if _user_file.exists() else _default()
 
 
-def _save_excludes(key: str, path: Path) -> None:
-    save_list(path, "\n".join(st.session_state[key]))
+def _set_excludes(key: str, values: list[str]) -> None:
+    st.session_state[key] = list(values)
+    st.session_state[f"{key}_w"] = list(values)
+    save_list(EXCLUDE_SOURCES[key][0], "\n".join(values))
 
 
-def _add_bulk(key: str, path: Path) -> None:
+def _on_tags(key: str) -> None:
+    _set_excludes(key, st.session_state[f"{key}_w"])
+
+
+def _add_bulk(key: str) -> None:
     """붙여넣은 여러 개(쉼표·줄바꿈 구분)를 목록에 더한다. 이미 있는 것(대소문자 무시)은 건너뛴다."""
     have = {v.lower() for v in st.session_state[key]}
     new = [v for v in dict.fromkeys(parse_exclude_list(st.session_state[f"{key}_bulk"])) if v.lower() not in have]
-    st.session_state[key] = st.session_state[key] + new
     st.session_state[f"{key}_bulk"] = ""
-    _save_excludes(key, path)
+    _set_excludes(key, st.session_state[key] + new)
 
 
-def _reset(key: str, path: Path, values: list[str]) -> None:
-    st.session_state[key] = list(values)
-    _save_excludes(key, path)
+def _reset(key: str) -> None:
+    _set_excludes(key, EXCLUDE_SOURCES[key][1]())
 
 
-def exclude_editor(key: str, path: Path, label: str, help_text: str, reset_to: list[str] | None = None) -> None:
+def exclude_editor(key: str, label: str, help_text: str) -> None:
     # 태그 입력: 칸에 글자를 치고 Enter 로 하나씩 추가, 태그의 × 로 삭제
-    st.multiselect(label, options=st.session_state[key], key=key, accept_new_options=True,
-                   placeholder="입력 후 Enter 로 추가", help=help_text, on_change=_save_excludes, args=(key, path))
+    wkey = f"{key}_w"
+    if wkey not in st.session_state:
+        st.session_state[wkey] = list(st.session_state[key])
+    options = list(dict.fromkeys(st.session_state[key] + st.session_state[wkey]))
+    st.multiselect(label, options=options, key=wkey, accept_new_options=True,
+                   placeholder="입력 후 Enter 로 추가", help=help_text, on_change=_on_tags, args=(key,))
     st.text_input("여러 개 한 번에 추가", key=f"{key}_bulk", placeholder="쉼표로 구분해 붙여넣고 Enter",
-                  on_change=_add_bulk, args=(key, path), label_visibility="collapsed")
-    if reset_to is not None:
-        st.button("기본값으로 되돌리기", key=f"{key}_reset", on_click=_reset, args=(key, path, reset_to),
-                  type="tertiary", icon=":material/restart_alt:")
+                  on_change=_add_bulk, args=(key,), label_visibility="collapsed")
+    st.button("기본값으로 되돌리기", key=f"{key}_reset", on_click=_reset, args=(key,),
+              type="tertiary", icon=":material/restart_alt:", help="GitHub에 올라가 있는 기본 목록으로 돌아갑니다.")
 
 
 with st.container(border=True, key="search_card"):
@@ -155,11 +181,10 @@ with st.container(border=True, key="search_card"):
     n_titles, n_companies = len(st.session_state["ex_titles"]), len(st.session_state["ex_companies"])
     with e1.popover(f"제외 설정 · 단어 {n_titles}개 · 업체 {n_companies}개", icon=":material/block:",
                     width="stretch"):
-        exclude_editor("ex_titles", EXCLUDE_TITLE_FILE, "제외할 직무 단어 (공고 제목 기준)",
-                       "공고 제목에 이 단어가 있으면 뺍니다. 띄어쓰기·대소문자는 무시합니다. 모두 지우면 이 필터를 쓰지 않습니다.",
-                       reset_to=DEFAULT_EXCLUDE_TITLE_KEYWORDS)
+        exclude_editor("ex_titles", "제외할 직무 단어 (공고 제목 기준)",
+                       "공고 제목에 이 단어가 있으면 뺍니다. 띄어쓰기·대소문자는 무시합니다. 모두 지우면 이 필터를 쓰지 않습니다.")
         st.divider()
-        exclude_editor("ex_companies", EXCLUDE_FILE, "제외할 업체",
+        exclude_editor("ex_companies", "제외할 업체",
                        "(주), ㈜, 주식회사, 띄어쓰기는 무시하고 이름 일부만 맞아도 제외합니다.")
     max_pages = e2.slider("검색어별 최대 페이지 수", 1, 10, 5,
                           help="기간을 길게 잡으면 늘려 주세요. 클수록 오래 걸립니다.")

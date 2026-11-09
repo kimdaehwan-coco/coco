@@ -3,6 +3,8 @@ __pycache__/
 .env
 .claude/
 .streamlit/secrets.toml
+# 화면에서 고친 제외 목록 (기본 목록은 config/*.txt)
+config/user/
 # 내려받은 결과 파일
 *.xlsx
 *.csv

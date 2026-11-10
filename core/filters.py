@@ -13,6 +13,11 @@ def normalize_company(name: str) -> str:
     return _COMPANY_NOISE.sub("", name or "").lower()
 
 
+def clean_company_name(name: str) -> str:
+    """제외 목록에 넣을 회사 이름: (주)·주식회사·공백 등을 뺀 이름 (대소문자는 그대로)."""
+    return _COMPANY_NOISE.sub("", name or "").strip()
+
+
 def parse_exclude_list(text: str) -> list[str]:
     parts = re.split(r"[,\n]", text or "")
     return [p.strip() for p in parts if p.strip()]

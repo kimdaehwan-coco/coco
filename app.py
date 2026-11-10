@@ -14,7 +14,7 @@ from core.clock import now_kst, today_kst
 from core.codes import (DEFAULT_EXCLUDE_TITLE_KEYWORDS, DEFAULT_JOB_CATEGORIES, DEFAULT_REGIONS,
                         EMPLOYMENT_TYPES, JOB_CATEGORIES, REGIONS, SITES)
 from core.export import build_excel
-from core.filters import parse_exclude_list
+from core.filters import clean_company_name, is_excluded, normalize_company, parse_exclude_list
 from core.models import SearchCondition
 from core.search import run_search
 
@@ -225,6 +225,9 @@ if run:
     st.session_state["page"] = 1
     st.session_state["selected_ids"] = set()
 
+if _msg := st.session_state.pop("exclude_msg", None):
+    st.toast(_msg, icon=":material/block:")
+
 result = st.session_state.get("result")
 if result is None:
     st.info("위에서 조건을 고르고 **검색**을 누르세요.")
@@ -266,7 +269,8 @@ def go_page(n: int) -> None:
 # 행을 선택하면 그 줄의 배경색을 바꿔 눈에 띄게 한다 (왼쪽 체크칸으로 여러 줄 선택 가능)
 # Streamlit은 화면에서 사라진 표(다른 쪽)의 선택을 지우므로, 선택한 공고 번호(전체 기준)를 따로 기억해 두고
 # 그 쪽으로 돌아오면 selection_default 로 체크칸을 다시 채운다.
-TABLE_KEY = f"result_table_{page}"
+# table_ver: 결과에서 공고를 빼면 올려서 표를 새로 만든다 (브라우저에 남은 체크 표시까지 지우려고)
+TABLE_KEY = f"result_table_{st.session_state.get('table_ver', 0)}_{page}"
 SELECTED_STYLE = "background-color: #FFE9A8; color: #1F2937; font-weight: 600"
 store: set[int] = st.session_state.setdefault("selected_ids", set())
 
@@ -300,8 +304,35 @@ _ua = (st.context.headers.get("User-Agent") or "").lower()
 IS_MOBILE = any(k in _ua for k in ("iphone", "ipad", "android", "mobile"))
 
 
+def exclude_from_results(companies: list[str]) -> None:
+    """회사들을 제외 업체 목록에 넣고, 지금 결과에서도 바로 뺀다."""
+    names = [n for n in dict.fromkeys(clean_company_name(c) for c in companies) if n]
+    if not names:
+        return
+    have = {normalize_company(v) for v in st.session_state["ex_companies"]}
+    added = [n for n in names if normalize_company(n) not in have]
+    _set_excludes("ex_companies", st.session_state["ex_companies"] + added)
+
+    res = st.session_state["result"]
+    before = len(res.postings)
+    res.postings = [p for p in res.postings if not is_excluded(p.company, names)]
+    removed = before - len(res.postings)
+    res.dropped["제외업체"] = res.dropped.get("제외업체", 0) + removed
+    st.session_state["cond"].exclude_companies = list(st.session_state["ex_companies"])  # 엑셀 '검색 조건' 시트용
+    # 결과 줄 번호가 바뀌므로 선택·체크 상태는 비운다 (쪽 번호는 남는 줄 수에 맞게 위에서 다시 조정됨)
+    for k in [k for k in st.session_state if str(k).startswith(("result_table", "chk_"))]:
+        del st.session_state[k]
+    st.session_state["selected_ids"] = set()
+    st.session_state["table_ver"] = st.session_state.get("table_ver", 0) + 1
+    st.session_state["exclude_msg"] = (f"제외 업체에 추가: {', '.join(added)}" if added else "이미 제외 목록에 있는 업체예요") \
+        + f" · 결과에서 {removed}건 뺐어요"
+
+
+VER = st.session_state.get("table_ver", 0)
+
+
 def toggle_card(i: int) -> None:
-    if st.session_state[f"chk_{i}"]:
+    if st.session_state[f"chk_{VER}_{i}"]:
         store.add(i)
     else:
         store.discard(i)
@@ -334,6 +365,14 @@ with st.container(border=True, key="result_card"):
     h3.download_button("CSV 다운로드", lambda: df.to_csv(index=False).encode("utf-8-sig"),
                        file_name=f"jobs_{stamp}.csv", mime="text/csv", width="stretch")
 
+    # 선택한 공고(표의 체크칸·카드의 '선택', 모든 쪽 합계)의 회사를 한 번에 제외 업체로
+    sel_companies = sorted({df.at[i, "회사명"] for i in store if i < len(df)})
+    st.button(f"선택한 공고의 업체 {len(sel_companies)}곳을 제외 업체에 포함" if sel_companies
+              else "제외 업체에 포함 (먼저 공고를 선택하세요)",
+              key="exc_selected", icon=":material/block:", disabled=not sel_companies,
+              on_click=exclude_from_results, args=(sel_companies,),
+              help="선택한 공고의 회사를 제외 업체 목록에 넣고, 지금 결과에서도 그 회사 공고를 모두 뺍니다.")
+
     if mode == "표":
         styled = page_view.style.apply(lambda r: [SELECTED_STYLE if r.name in selected_rows else ""] * len(r), axis=1)
         st.dataframe(
@@ -350,7 +389,11 @@ with st.container(border=True, key="result_card"):
         for idx, row in page_view.iterrows():
             with st.container(border=True, key=f"card_{idx}"):
                 st.markdown(card_html(row), unsafe_allow_html=True)
-                st.checkbox("선택", value=idx in store, key=f"chk_{idx}", on_change=toggle_card, args=(idx,))
+                with st.container(horizontal=True, vertical_alignment="center", gap="medium"):
+                    st.checkbox("선택", value=idx in store, key=f"chk_{VER}_{idx}", on_change=toggle_card, args=(idx,))
+                    st.button("제외 업체에 포함", key=f"exc_{VER}_{idx}", type="tertiary", icon=":material/block:",
+                              on_click=exclude_from_results, args=([row["회사명"]],),
+                              help=f"'{row['회사명']}'을(를) 제외 업체에 넣고 결과에서 뺍니다.")
 
     # 쪽 이동: « ‹ 1 2 3 … › »  (쪽 번호는 현재 쪽 주변 최대 10개, 휴대폰은 5개)
     # 가로 컨테이너라 휴대폰에서도 세로로 쌓이지 않고, 자리가 모자라면 다음 줄로 넘어간다

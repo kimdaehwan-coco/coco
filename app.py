@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import html
 import importlib
+import os
 import sys
 import time
 from pathlib import Path
@@ -22,7 +23,10 @@ def _reload_changed_modules() -> None:
     서버 시작 후 고쳐진 파일만, 고쳐질 때마다 한 번씩 다시 읽는다. 의존 순서대로 읽어야 해서 순서를 정해 둔다.
     """
     import core  # noqa: F401  (패키지에 서버 시작 시각을 기록해 두는 용도)
-    started = core.__dict__.setdefault("_fj_started", time.time())
+    # 서버(파이썬 프로세스)가 켜진 시각. 리눅스(클라우드)는 /proc 에서 실제 시작 시각을 읽고,
+    # 없으면(Windows) 이 코드가 처음 돈 시각을 쓴다.
+    proc = Path(f"/proc/{os.getpid()}")
+    started = core.__dict__.setdefault("_fj_proc_started", proc.stat().st_ctime if proc.exists() else time.time())
     order = ["core.clock", "core.codes", "core.models", "core.filters", "core.export",
              "scrapers.base", "scrapers.saramin", "scrapers.jobkorea", "scrapers.work24", "core.search"]
     for name in order:

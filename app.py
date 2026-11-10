@@ -5,12 +5,40 @@
 from __future__ import annotations
 
 import html
+import importlib
+import sys
+import time
 from pathlib import Path
 
 import pandas as pd
 import streamlit as st
 
-from core.clock import now_kst, today_kst
+
+def _reload_changed_modules() -> None:
+    """서버가 켜진 뒤 바뀐 core/·scrapers/ 파일을 다시 읽는다.
+
+    Streamlit 클라우드는 GitHub에서 새 코드를 받으면 app.py만 다시 실행하고, 이미 불러 둔 core/ 모듈은
+    예전 것을 그대로 쓴다. 그러면 app.py가 새로 만든 함수를 못 찾아 ImportError가 난다(2026-11-10).
+    서버 시작 후 고쳐진 파일만, 고쳐질 때마다 한 번씩 다시 읽는다. 의존 순서대로 읽어야 해서 순서를 정해 둔다.
+    """
+    import core  # noqa: F401  (패키지에 서버 시작 시각을 기록해 두는 용도)
+    started = core.__dict__.setdefault("_fj_started", time.time())
+    order = ["core.clock", "core.codes", "core.models", "core.filters", "core.export",
+             "scrapers.base", "scrapers.saramin", "scrapers.jobkorea", "scrapers.work24", "core.search"]
+    for name in order:
+        mod = sys.modules.get(name)
+        path = getattr(mod, "__file__", None)
+        if not path:
+            continue
+        mtime = Path(path).stat().st_mtime
+        if mtime > started and getattr(mod, "_fj_mtime", None) != mtime:
+            mod = importlib.reload(mod)
+            mod._fj_mtime = mtime
+
+
+_reload_changed_modules()
+
+from core.clock import now_kst, today_kst  # noqa: E402  (위에서 바뀐 모듈을 다시 읽은 뒤 가져온다)
 from core.codes import (DEFAULT_EXCLUDE_TITLE_KEYWORDS, DEFAULT_JOB_CATEGORIES, DEFAULT_REGIONS,
                         EMPLOYMENT_TYPES, JOB_CATEGORIES, REGIONS, SITES)
 from core.export import build_excel

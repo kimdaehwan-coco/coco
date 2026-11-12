@@ -140,7 +140,7 @@ def _write_summary(ws, df: pd.DataFrame, cond: SearchCondition | None, created: 
             ("기간", f"{cond.date_from:%Y-%m-%d} ~ {cond.date_to:%Y-%m-%d}"),
             ("직무", ", ".join(cond.job_categories)),
             ("지역", ", ".join(cond.regions)),
-            ("경력", "경력 공고만 (신입·신입/경력·경력무관 제외)"),
+            ("경력", "경력·경력무관 공고 (신입·신입/경력 제외)"),
             ("고용형태", ", ".join(cond.employment_types)),
             ("검색 사이트", ", ".join(cond.sites)),
             ("제외 직무 단어", ", ".join(cond.exclude_title_keywords) or "없음"),

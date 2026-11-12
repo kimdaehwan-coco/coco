@@ -97,7 +97,7 @@ def apply_filters(postings: list[JobPosting], cond: SearchCondition) -> tuple[li
         if has_excluded_word(p.title, cond.exclude_title_keywords):
             dropped["제외직무"] += 1
             continue
-        if p.career_kind != "경력":
+        if p.career_kind not in ("경력", "경력무관"):
             dropped["경력"] += 1
             continue
         if not match_employment(p.employment_type, cond.employment_types):

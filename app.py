@@ -138,14 +138,32 @@ def section(title: str, note: str = "") -> None:
 # 저장소가 '진짜' 목록이다. 매 실행마다 저장소(20초 캐시)에서 읽어 세션에 맞춘다 → 다른 창에서 고친 것도 보인다.
 # 고칠 때는 목록 전체를 덮어쓰지 않고 '추가/삭제한 것'만 최신 내용에 반영한다 → 여러 창이 서로 지우지 않는다.
 # 태그 입력칸은 별도 키("…_w")를 쓴다. 입력칸 상태가 어떤 이유로 비어도 목록은 남아 있게 하기 위해서다.
-def _secrets() -> dict:
+def _secrets() -> tuple[dict, str]:
+    """Secrets 에서 GITHUB_TOKEN/GITHUB_REPO 를 읽는다. 두 번째 값은 화면에 보여줄 상태(값은 절대 넣지 않음)."""
     try:
-        return {k: st.secrets[k] for k in ("GITHUB_TOKEN", "GITHUB_REPO") if k in st.secrets}
-    except Exception:  # secrets.toml 이 없으면(이 PC) 그냥 빈 값
-        return {}
+        names = list(st.secrets.keys())
+    except FileNotFoundError:
+        return {}, "Secrets 없음"
+    except Exception as e:  # TOML 형식이 틀렸을 때 등
+        return {}, f"Secrets를 읽지 못함 ({type(e).__name__}: 형식 확인 필요)"
+    found: dict = {}
+    for k in ("GITHUB_TOKEN", "GITHUB_REPO"):
+        v = st.secrets.get(k)
+        if v is None:  # [github] 같은 묶음 안에 넣은 경우도 찾아본다
+            for n in names:
+                sec = st.secrets.get(n)
+                if hasattr(sec, "get") and sec.get(k) is not None:
+                    v = sec.get(k)
+                    break
+        if isinstance(v, str) and v.strip():
+            found[k] = v.strip()
+    if "GITHUB_TOKEN" in found:
+        return found, "Secrets의 GITHUB_TOKEN 사용"
+    return found, ("Secrets에 GITHUB_TOKEN 이 없음" + (f" (있는 이름: {', '.join(names)})" if names else " (비어 있음)"))
 
 
-STORE = make_store(_secrets(), USER_DIR)
+_SECRETS, SECRETS_STATUS = _secrets()
+STORE = make_store(_SECRETS, USER_DIR)
 STORE_NAMES = {"ex_titles": "exclude_title_keywords", "ex_companies": "exclude_companies"}
 DEFAULTS = {"ex_titles": default_titles, "ex_companies": default_companies}
 
@@ -211,7 +229,7 @@ def exclude_editor(key: str, label: str, help_text: str) -> None:
     st.button("기본값으로 되돌리기", key=f"{key}_reset", on_click=_reset, args=(key,),
               type="tertiary", icon=":material/restart_alt:", help="GitHub에 올라가 있는 기본 목록으로 돌아갑니다.")
     if key == "ex_companies":
-        st.caption(f"저장 위치: {STORE.label}")
+        st.caption(f"저장 위치: {STORE.label} · {SECRETS_STATUS}")
 
 
 with st.container(border=True, key="search_card"):

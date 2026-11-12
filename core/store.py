@@ -22,6 +22,28 @@ BRANCH = "settings"
 TIMEOUT = 15
 
 
+class StoreError(RuntimeError):
+    """저장소 오류. 메시지는 화면에 그대로 보여준다(토큰 값은 들어가지 않음)."""
+
+
+_GH_HINT = {
+    401: "토큰이 틀렸거나 만료됐어요. 새 토큰을 만들어 Secrets 의 GITHUB_TOKEN 을 바꿔 주세요.",
+    403: "토큰 권한이 부족해요. 토큰의 Repository permissions 에서 Contents 를 'Read and write' 로 바꿔 주세요.",
+    404: "토큰이 coco 저장소에 접근하지 못해요. 토큰의 Repository access 에서 coco 를 골랐는지 확인해 주세요.",
+}
+
+
+def _check(r: requests.Response, what: str) -> None:
+    if r.status_code < 400:
+        return
+    try:
+        msg = r.json().get("message", "")
+    except ValueError:
+        msg = ""
+    hint = _GH_HINT.get(r.status_code, "")
+    raise StoreError(f"GitHub {what} 실패 (HTTP {r.status_code}{': ' + msg if msg else ''}). {hint}".strip())
+
+
 def _norm(v: str) -> str:
     return v.strip().lower()
 
@@ -76,9 +98,9 @@ class GitHubStore:
 
     def _read(self, name: str) -> tuple[list[str] | None, str | None]:
         r = self.s.get(self._url(name), params={"ref": BRANCH}, timeout=TIMEOUT)
-        if r.status_code == 404:
+        if r.status_code == 404:  # 파일이나 settings 브랜치가 아직 없음 (또는 저장소 접근 불가 → 저장할 때 알려줌)
             return None, None
-        r.raise_for_status()
+        _check(r, "목록 읽기")
         j = r.json()
         return parse_exclude_list(base64.b64decode(j["content"]).decode("utf-8")), j["sha"]
 
@@ -87,19 +109,14 @@ class GitHubStore:
         if r.status_code == 200:
             return
         main = self.s.get(f"{API}/repos/{self.repo}/git/ref/heads/main", timeout=TIMEOUT)
-        main.raise_for_status()
+        _check(main, f"저장소({self.repo}) 확인")
         c = self.s.post(f"{API}/repos/{self.repo}/git/refs",
                         json={"ref": f"refs/heads/{BRANCH}", "sha": main.json()["object"]["sha"]}, timeout=TIMEOUT)
-        if c.status_code not in (201, 422):  # 422: 그 사이 다른 창이 만든 경우
-            c.raise_for_status()
+        if c.status_code != 422:  # 422: 그 사이 다른 창이 만든 경우
+            _check(c, "settings 브랜치 만들기")
 
     def load(self, name: str) -> list[str] | None:
-        try:
-            return self._read(name)[0]
-        except requests.HTTPError as e:
-            if e.response is not None and e.response.status_code == 404:  # 브랜치가 아직 없음
-                return None
-            raise
+        return self._read(name)[0]
 
     def update(self, name: str, change: Callable[[list[str]], list[str]], default: list[str]) -> list[str]:
         self._ensure_branch()
@@ -114,8 +131,8 @@ class GitHubStore:
             if r.status_code in (200, 201):
                 return new
             if r.status_code not in (409, 422):
-                r.raise_for_status()
-        raise RuntimeError("다른 창과 저장이 겹쳐 저장하지 못했습니다. 다시 시도해 주세요.")
+                _check(r, "목록 저장")
+        raise StoreError("다른 창과 저장이 겹쳐 저장하지 못했어요. 다시 시도해 주세요.")
 
 
 def make_store(secrets: dict, local_folder: Path) -> LocalStore | GitHubStore:

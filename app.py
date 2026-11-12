@@ -178,8 +178,11 @@ for _key, _name in STORE_NAMES.items():
         _saved = _load_saved(_name, STORE.kind)
     except Exception as _e:  # GitHub 이 잠깐 안 될 때: 지금 화면 값을 그대로 쓴다
         _saved = st.session_state.get(_key)
-        st.session_state["store_error"] = f"저장된 목록을 불러오지 못했어요 ({type(_e).__name__}). 잠시 뒤 다시 열어 주세요."
+        st.session_state["store_error"] = f"저장된 목록을 불러오지 못했어요. {_e}"
     _latest = list(_saved) if _saved is not None else DEFAULTS[_key]()
+    # 저장에 실패한 목록이 있으면 그 화면 값을 지킨다 (저장소 값으로 되돌리면 방금 넣은 것이 사라져 보임)
+    if f"{_key}_unsaved" in st.session_state:
+        _latest = st.session_state[f"{_key}_unsaved"]
     if st.session_state.get(_key) != _latest:
         st.session_state[_key] = _latest
         st.session_state[f"{_key}_w"] = list(_latest)
@@ -191,9 +194,12 @@ def _change(key: str, add: list[str] = (), remove: list[str] = (), replace: list
         return list(replace) if replace is not None else apply_change(cur, add, remove)
     try:
         new = STORE.update(STORE_NAMES[key], fn, DEFAULTS[key]())
+        st.session_state.pop(f"{key}_unsaved", None)
     except Exception as e:
-        st.session_state["store_error"] = f"저장하지 못했어요 ({type(e).__name__}). 잠시 뒤 다시 해 주세요."
+        # 저장은 못 했지만 이 창에서는 넣은 내용을 계속 보여주고 검색에도 쓴다. 이유는 화면 위에 그대로 알려준다.
+        st.session_state["store_error"] = f"제외 목록을 저장하지 못했어요 (이 창에서만 적용 중). {e}"
         new = fn(st.session_state[key])
+        st.session_state[f"{key}_unsaved"] = new
     _load_saved.clear()
     st.session_state[key] = new
     st.session_state[f"{key}_w"] = list(new)

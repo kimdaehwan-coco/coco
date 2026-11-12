@@ -27,7 +27,7 @@ def _reload_changed_modules() -> None:
     # 없으면(Windows) 이 코드가 처음 돈 시각을 쓴다.
     proc = Path(f"/proc/{os.getpid()}")
     started = core.__dict__.setdefault("_fj_proc_started", proc.stat().st_ctime if proc.exists() else time.time())
-    order = ["core.clock", "core.codes", "core.models", "core.filters", "core.export",
+    order = ["core.clock", "core.codes", "core.models", "core.filters", "core.store", "core.export",
              "scrapers.base", "scrapers.saramin", "scrapers.jobkorea", "scrapers.work24", "core.search"]
     for name in order:
         mod = sys.modules.get(name)
@@ -48,17 +48,15 @@ from core.codes import (DEFAULT_EXCLUDE_TITLE_KEYWORDS, DEFAULT_JOB_CATEGORIES, 
 from core.export import build_excel
 from core.filters import clean_company_name, is_excluded, normalize_company, parse_exclude_list
 from core.models import SearchCondition
-from core.search import run_search
+from core.search import run_search  # noqa: E402
+from core.store import apply_change, make_store  # noqa: E402
 
 ROOT = Path(__file__).parent
 # 기본 목록: GitHub에 올라가는 원본. 앱이 실행 중에 이 파일을 고치지 않는다 (읽기만).
 EXCLUDE_FILE = ROOT / "config" / "exclude_companies.txt"
 EXCLUDE_TITLE_FILE = ROOT / "config" / "exclude_title_keywords.txt"
-# 화면에서 고친 목록은 따로 저장한다 (config/user/, GitHub에 올리지 않음).
-# 원본을 덮어쓰지 않으므로 잘못 저장돼도 '기본값으로 되돌리기'로 복구되고, 클라우드가 새 코드를 받을 때도 충돌이 없다.
+# 화면에서 고친 목록은 core/store.py 저장소에 따로 둔다 (토큰이 없으면 config/user/, GitHub에 올리지 않음).
 USER_DIR = ROOT / "config" / "user"
-USER_EXCLUDE_FILE = USER_DIR / "exclude_companies.txt"
-USER_EXCLUDE_TITLE_FILE = USER_DIR / "exclude_title_keywords.txt"
 
 
 def load_list(path: Path, default: str = "") -> str:
@@ -71,11 +69,6 @@ def default_titles() -> list[str]:
 
 def default_companies() -> list[str]:
     return parse_exclude_list(load_list(EXCLUDE_FILE))
-
-
-def save_list(path: Path, text: str) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text("\n".join(parse_exclude_list(text)), encoding="utf-8")
 
 
 st.set_page_config(page_title="findJob · 채용공고 모아보기", layout="wide")
@@ -140,38 +133,69 @@ def section(title: str, note: str = "") -> None:
 
 
 # ── 제외 단어·업체 ──
-# 목록 자체는 세션의 "ex_titles"/"ex_companies"에 두고, 태그 입력칸은 별도 키("…_w")를 쓴다.
-# 입력칸 상태가 어떤 이유로 비어도 목록은 남아 있게 하기 위해서다.
-# 처음 열 때: 화면에서 고친 파일(config/user/)이 있으면 그것을, 없으면 기본 목록(config/*.txt)을 쓴다.
-EXCLUDE_SOURCES = {
-    "ex_titles": (USER_EXCLUDE_TITLE_FILE, default_titles),
-    "ex_companies": (USER_EXCLUDE_FILE, default_companies),
-}
-for _key, (_user_file, _default) in EXCLUDE_SOURCES.items():
-    if _key not in st.session_state:
-        st.session_state[_key] = parse_exclude_list(load_list(_user_file)) if _user_file.exists() else _default()
+# 저장소(core/store.py): Secrets 에 GITHUB_TOKEN 이 있으면 GitHub settings 브랜치, 없으면 config/user/ 파일.
+#   클라우드 디스크는 앱이 다시 켜질 때마다 지워져서, 오래 보관하려면 GitHub 쪽을 써야 한다.
+# 저장소가 '진짜' 목록이다. 매 실행마다 저장소(20초 캐시)에서 읽어 세션에 맞춘다 → 다른 창에서 고친 것도 보인다.
+# 고칠 때는 목록 전체를 덮어쓰지 않고 '추가/삭제한 것'만 최신 내용에 반영한다 → 여러 창이 서로 지우지 않는다.
+# 태그 입력칸은 별도 키("…_w")를 쓴다. 입력칸 상태가 어떤 이유로 비어도 목록은 남아 있게 하기 위해서다.
+def _secrets() -> dict:
+    try:
+        return {k: st.secrets[k] for k in ("GITHUB_TOKEN", "GITHUB_REPO") if k in st.secrets}
+    except Exception:  # secrets.toml 이 없으면(이 PC) 그냥 빈 값
+        return {}
 
 
-def _set_excludes(key: str, values: list[str]) -> None:
-    st.session_state[key] = list(values)
-    st.session_state[f"{key}_w"] = list(values)
-    save_list(EXCLUDE_SOURCES[key][0], "\n".join(values))
+STORE = make_store(_secrets(), USER_DIR)
+STORE_NAMES = {"ex_titles": "exclude_title_keywords", "ex_companies": "exclude_companies"}
+DEFAULTS = {"ex_titles": default_titles, "ex_companies": default_companies}
+
+
+@st.cache_data(ttl=20, show_spinner=False)
+def _load_saved(name: str, kind: str) -> list[str] | None:  # kind: 저장소가 바뀌면 캐시도 따로
+    return STORE.load(name)
+
+
+for _key, _name in STORE_NAMES.items():
+    try:
+        _saved = _load_saved(_name, STORE.kind)
+    except Exception as _e:  # GitHub 이 잠깐 안 될 때: 지금 화면 값을 그대로 쓴다
+        _saved = st.session_state.get(_key)
+        st.session_state["store_error"] = f"저장된 목록을 불러오지 못했어요 ({type(_e).__name__}). 잠시 뒤 다시 열어 주세요."
+    _latest = list(_saved) if _saved is not None else DEFAULTS[_key]()
+    if st.session_state.get(_key) != _latest:
+        st.session_state[_key] = _latest
+        st.session_state[f"{_key}_w"] = list(_latest)
+
+
+def _change(key: str, add: list[str] = (), remove: list[str] = (), replace: list[str] | None = None) -> None:
+    """저장소의 최신 목록에 추가/삭제(또는 통째 교체)를 반영하고 화면 값도 맞춘다."""
+    def fn(cur: list[str]) -> list[str]:
+        return list(replace) if replace is not None else apply_change(cur, add, remove)
+    try:
+        new = STORE.update(STORE_NAMES[key], fn, DEFAULTS[key]())
+    except Exception as e:
+        st.session_state["store_error"] = f"저장하지 못했어요 ({type(e).__name__}). 잠시 뒤 다시 해 주세요."
+        new = fn(st.session_state[key])
+    _load_saved.clear()
+    st.session_state[key] = new
+    st.session_state[f"{key}_w"] = list(new)
 
 
 def _on_tags(key: str) -> None:
-    _set_excludes(key, st.session_state[f"{key}_w"])
+    old, new = st.session_state[key], st.session_state[f"{key}_w"]
+    old_n, new_n = {v.lower() for v in old}, {v.lower() for v in new}
+    _change(key, add=[v for v in new if v.lower() not in old_n], remove=[v for v in old if v.lower() not in new_n])
 
 
 def _add_bulk(key: str) -> None:
     """붙여넣은 여러 개(쉼표·줄바꿈 구분)를 목록에 더한다. 이미 있는 것(대소문자 무시)은 건너뛴다."""
-    have = {v.lower() for v in st.session_state[key]}
-    new = [v for v in dict.fromkeys(parse_exclude_list(st.session_state[f"{key}_bulk"])) if v.lower() not in have]
+    items = parse_exclude_list(st.session_state[f"{key}_bulk"])
     st.session_state[f"{key}_bulk"] = ""
-    _set_excludes(key, st.session_state[key] + new)
+    _change(key, add=items)
 
 
 def _reset(key: str) -> None:
-    _set_excludes(key, EXCLUDE_SOURCES[key][1]())
+    _change(key, replace=DEFAULTS[key]())
 
 
 def exclude_editor(key: str, label: str, help_text: str) -> None:
@@ -186,6 +210,8 @@ def exclude_editor(key: str, label: str, help_text: str) -> None:
                   on_change=_add_bulk, args=(key,), label_visibility="collapsed")
     st.button("기본값으로 되돌리기", key=f"{key}_reset", on_click=_reset, args=(key,),
               type="tertiary", icon=":material/restart_alt:", help="GitHub에 올라가 있는 기본 목록으로 돌아갑니다.")
+    if key == "ex_companies":
+        st.caption(f"저장 위치: {STORE.label}")
 
 
 with st.container(border=True, key="search_card"):
@@ -259,6 +285,8 @@ if run:
 
 if _msg := st.session_state.pop("exclude_msg", None):
     st.toast(_msg, icon=":material/block:")
+if _err := st.session_state.pop("store_error", None):
+    st.warning(_err, icon=":material/cloud_off:")
 
 result = st.session_state.get("result")
 if result is None:
@@ -343,7 +371,7 @@ def exclude_from_results(companies: list[str]) -> None:
         return
     have = {normalize_company(v) for v in st.session_state["ex_companies"]}
     added = [n for n in names if normalize_company(n) not in have]
-    _set_excludes("ex_companies", st.session_state["ex_companies"] + added)
+    _change("ex_companies", add=added)
 
     res = st.session_state["result"]
     before = len(res.postings)

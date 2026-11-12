@@ -8,6 +8,7 @@ import html
 import importlib
 import os
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -206,6 +207,8 @@ def _change(key: str, add: list[str] = (), remove: list[str] = (), replace: list
 
 
 def _on_tags(key: str) -> None:
+    if f"{key}_w" not in st.session_state:  # 입력칸 상태가 없는 실행(중단·재시작 직후)에는 '전부 삭제'로 착각하지 않는다
+        return
     old, new = st.session_state[key], st.session_state[f"{key}_w"]
     old_n, new_n = {v.lower() for v in old}, {v.lower() for v in new}
     _change(key, add=[v for v in new if v.lower() not in old_n], remove=[v for v in old if v.lower() not in new_n])
@@ -239,7 +242,7 @@ def exclude_editor(key: str, label: str, help_text: str) -> None:
 
 
 with st.container(border=True, key="search_card"):
-    section("검색 조건", "경력은 '경력' 공고만 찾습니다 (신입·신입/경력·경력무관 제외)")
+    section("검색 조건", "경력은 '경력'·'경력무관' 공고를 찾습니다 (신입·신입/경력 제외)")
     today = today_kst()  # 클라우드 서버는 UTC 라서 한국 날짜로 맞춘다
     # 1줄: 기간 · 지역 · 고용형태
     c1, c2, c3, c4 = st.columns([1.3, 1.3, 2, 2])
@@ -289,23 +292,45 @@ if run:
     cond = SearchCondition(date_from=date_from, date_to=date_to, job_categories=jobs, regions=regions,
                            employment_types=emps, sites=sites, exclude_companies=exclude_companies,
                            exclude_title_keywords=exclude_titles, max_pages=max_pages)
-    with st.status("검색 중…", expanded=True) as status:
-        lines: list[str] = []
+    # 검색은 별도 스레드에서 돌린다. 검색 중에 조건을 건드리면 Streamlit 이 화면 스크립트를 중단하고 다시 실행하는데,
+    # 검색을 스크립트 안에서 직접 돌리면 그때 결과가 통째로 사라진다. 스레드는 영향받지 않고, 다시 실행된 화면이 이어서 기다린다.
+    if st.session_state.get("job") is None:
+        job = {"lines": [], "cond": cond, "result": None, "error": None}
+
+        def _work(j: dict = job) -> None:
+            try:
+                j["result"] = run_search(j["cond"], log=j["lines"].append)
+            except Exception as e:  # noqa: BLE001
+                j["error"] = f"{type(e).__name__}: {e}"
+
+        job["thread"] = threading.Thread(target=_work, daemon=True)
+        job["thread"].start()
+        st.session_state["job"] = job
+
+_job = st.session_state.get("job")
+if _job is not None:
+    with st.status("검색 중… (조건을 바꿔도 검색은 계속됩니다)", expanded=True) as status:
         box = st.empty()
-
-        def log(msg: str) -> None:
-            lines.append(msg)  # 스레드에서 불리므로 화면 갱신은 끝난 뒤에 한 번만
-
-        result = run_search(cond, log=log)
-        box.code("\n".join(lines) or "(로그 없음)")
-        status.update(label=f"검색 완료: {len(result.postings)}건", state="complete", expanded=False)
-    st.session_state["result"] = result
-    st.session_state["cond"] = cond
-    # 새 결과에는 이전 선택·쪽 번호를 남기지 않는다
-    for k in [k for k in st.session_state if str(k).startswith(("result_table", "chk_"))]:
-        del st.session_state[k]
-    st.session_state["page"] = 1
-    st.session_state["selected_ids"] = set()
+        while _job["thread"].is_alive():
+            box.code("\n".join(_job["lines"][-30:]) or "(로그 없음)")
+            time.sleep(0.7)
+        box.code("\n".join(_job["lines"]) or "(로그 없음)")
+        if _job["error"]:
+            status.update(label="검색 실패", state="error", expanded=True)
+        else:
+            status.update(label=f"검색 완료: {len(_job['result'].postings)}건", state="complete", expanded=False)
+    st.session_state.pop("job", None)
+    if _job["error"]:
+        st.error(f"검색 중 오류가 났어요. {_job['error']}")
+    else:
+        result, cond = _job["result"], _job["cond"]
+        st.session_state["result"] = result
+        st.session_state["cond"] = cond
+        # 새 결과에는 이전 선택·쪽 번호를 남기지 않는다
+        for k in [k for k in st.session_state if str(k).startswith(("result_table", "chk_"))]:
+            del st.session_state[k]
+        st.session_state["page"] = 1
+        st.session_state["selected_ids"] = set()
 
 if _msg := st.session_state.pop("exclude_msg", None):
     st.toast(_msg, icon=":material/block:")

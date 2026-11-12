@@ -102,6 +102,9 @@
    ```
 3. 1분쯤 뒤 앱을 새로 고치고 '제외 설정' 팝업 맨 아래가 "저장 위치: GitHub settings 브랜치"인지 확인한다.
 - 토큰은 Secrets에만 넣는다. 코드나 `config/` 파일, `.streamlit/secrets.toml`(GitHub에 안 올라감)에 넣어 push 하지 않는다.
+- 팝업 맨 아래에 '저장 위치 · 토큰 인식 상태'가 나온다(토큰 값은 안 보임). 저장이 실패하면 화면 위 경고에 GitHub이 거부한 이유가 나오고, 넣은 내용은 그 창에서만 계속 쓴다.
+  - **HTTP 403 "Resource not accessible by personal access token"** (2026-11-12 실제로 겪음): 토큰에 저장소·권한이 하나도 없던 경우. coco가 공개 저장소라 읽기는 되지만 쓰기가 거부된다. 토큰 화면의 'Access on …' 옆 **Edit** → Repository access에서 **coco** 선택 → Permissions의 **+ Add permissions**에서 **Contents** 추가 → **Read and write** → **Update**. 토큰 글자는 그대로라 Secrets는 다시 고치지 않아도 된다.
+  - HTTP 401: 토큰이 틀렸거나 만료됨 → 새 토큰을 Secrets에 다시 넣는다. HTTP 404: 토큰이 coco에 접근 못 함 → Repository access 확인.
 
 ## 3. 화면 구성 (Streamlit)
 맨 위 남색 제목 띠 아래에 흰 카드 모양의 **검색 조건** 상자(조건 세 줄)를 두고, 그 아래에 결과를 보여준다.

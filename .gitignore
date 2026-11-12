@@ -1,10 +1,49 @@
-__pycache__/
-*.pyc
+# ── 비밀값 (절대 올리면 안 됨) ──────────────────────────
+# API 키·토큰을 넣는 파일. 예시 파일(.env.example)만 올린다.
 .env
-.claude/
+.env.*
+!.env.example
+*.env
+# Streamlit 비밀값 (클라우드는 앱 Settings → Secrets 에 넣음)
 .streamlit/secrets.toml
+secrets.toml
+secrets.json
+# 인증서·개인 키·서비스 계정 파일
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa*
+id_ed25519*
+credentials*.json
+service-account*.json
+token*.txt
+
+# ── 이 PC 에서만 쓰는 파일 ─────────────────────────────
+# Claude Code 설정 (내 PC 경로·권한 정보)
+.claude/
 # 화면에서 고친 제외 목록 (기본 목록은 config/*.txt)
 config/user/
 # 내려받은 결과 파일
 *.xlsx
 *.csv
+# 로그
+*.log
+logs/
+
+# ── 파이썬·도구가 만드는 파일 ──────────────────────────
+__pycache__/
+*.pyc
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ipynb_checkpoints/
+.vscode/
+.idea/
+
+# ── 운영체제가 만드는 파일 ─────────────────────────────
+Thumbs.db
+desktop.ini
+.DS_Store

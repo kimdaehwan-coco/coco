@@ -269,7 +269,7 @@ findJob/
 ├─ sample_jobs.xlsx            # 엑셀 디자인 샘플 (실제 검색 결과 17건)
 ├─ 실행.bat                    # 더블클릭으로 서버 켜기 (이미 켜져 있으면 브라우저만 엶)
 ├─ .env.example
-├─ .gitignore                  # GitHub에 올리지 않을 파일 (.env, .claude/, 엑셀·CSV)
+├─ .gitignore                  # GitHub에 올리지 않을 파일 (11.1 참고: .env·Secrets·키 파일, .claude/, config/user/, 엑셀·CSV)
 ├─ requirements.txt            # 클라우드도 이 목록으로 설치한다
 └─ SPEC.md
 ```
@@ -285,9 +285,15 @@ streamlit run app.py
 ### 10.1 PC 없이 웹·휴대폰으로 보기 — Streamlit Community Cloud (무료)
 PC에서 서버를 켜지 않아도 되도록 Streamlit 무료 클라우드에 올려 둔다. 올리면 `https://<이름>.streamlit.app` 주소가 생기고, PC·휴대폰 브라우저 어디서나 열린다.
 
+**지금 쓰는 곳 (2026-11-12 기준)**
+- 코드 저장소: GitHub `kimdaehwan-coco/coco` (공개 저장소), 브랜치 `main`
+- 제외 목록 저장: 같은 저장소의 `settings` 브랜치 (2.5)
+- 앱 주소: https://findjob-coco.streamlit.app
+- 공개 저장소에서 만든 앱이라 주소를 아는 사람은 누구나 열 수 있다. 비밀값은 코드가 아니라 Secrets에만 있으므로 노출되지 않는다.
+
 **올리는 순서 (처음 한 번)**
 1. GitHub 계정을 만들고 **비공개(Private) 저장소**를 하나 만든다 (예: `findJob`).
-2. 이 폴더를 그 저장소에 올린다 (`.gitignore`가 `.env`, `.claude/`, 엑셀·CSV 파일은 빼 준다).
+2. 이 폴더를 그 저장소에 올린다 (`.gitignore`가 `.env`·키 파일, `.claude/`, 엑셀·CSV 파일은 빼 준다. 11.1 참고).
    ```bash
    git init
    git add .
@@ -312,6 +318,8 @@ PC에서 서버를 켜지 않아도 되도록 Streamlit 무료 클라우드에 �
   - 기준 시각은 서버 프로세스 시작 시각이다(리눅스 `/proc/<pid>`, Windows는 처음 실행 시각).
   - 새 파일을 `core/`·`scrapers/`에 추가하면 `_reload_changed_modules()`의 `order` 목록에도 넣는다.
 - 앱을 연 다른 창에서 검색이 돌고 있으면 새 코드 반영이 늦을 수 있다. 그럴 때는 그 창의 검색을 멈추거나 Manage app → ⋮ → Reboot app.
+- GitHub 토큰(`GITHUB_TOKEN`) 만료일은 **2026-12-12**이다. 지나면 제외 목록 저장이 "HTTP 401" 경고와 함께 실패한다. GitHub 토큰 화면에서 **Regenerate token** → 새 토큰을 Secrets의 `GITHUB_TOKEN`에 다시 넣는다.
+- 화면 맨 아래 오른쪽의 Streamlit 배지('Hosted with Streamlit' 등)는 무료 클라우드가 붙이는 것이라 앱 코드로 지울 수 없다. 주소 끝에 `?embed=true`를 붙여 열면(`https://findjob-coco.streamlit.app/?embed=true`) 배지 없이 보인다. 휴대폰 홈 화면에 추가할 때 이 주소를 써도 된다.
 
 ### 10.2 휴대폰 화면
 - 휴대폰(브라우저 User-Agent에 iPhone·Android·Mobile)으로 열면 결과를 **카드 목록**으로 보여준다. 표는 열이 많아 휴대폰 폭에 들어가지 않기 때문이다.
@@ -333,5 +341,15 @@ PC에서 서버를 켜지 않아도 되도록 Streamlit 무료 클라우드에 �
 ## 11. 주의사항
 - 각 사이트의 이용약관과 robots.txt를 지키고, 개인 용도로만 쓴다.
 - 사이트 화면 구조가 바뀌면 크롤러가 깨질 수 있다. 사이트별 파일(`scrapers/`)을 분리해 두었으니 깨진 사이트만 고치면 된다.
+
+### 11.1 비밀값과 GitHub에 올리지 않는 파일
+- 저장소가 공개라서 비밀값은 절대 커밋하지 않는다. 클라우드는 Streamlit **Secrets**, 이 PC는 `.env`(예시는 `.env.example`)에 둔다.
+- `.gitignore`가 빼 주는 파일 (2026-11-12 보강)
+  - 비밀값: `.env`, `.env.*`(`.env.example`은 올림), `.streamlit/secrets.toml`, `secrets.toml`/`secrets.json`
+  - 키·인증서: `*.pem`, `*.key`, `*.p12`, `*.pfx`, `id_rsa*`, `id_ed25519*`, `credentials*.json`, `service-account*.json`, `token*.txt`
+  - 이 PC 전용: `.claude/`, `config/user/`, 내려받은 `*.xlsx`·`*.csv`, `*.log`
+  - 도구·운영체제: `__pycache__/`, `.venv/`, `.vscode/`, `.idea/`, `Thumbs.db`, `desktop.ini`, `.DS_Store`
+- 2026-11-12에 커밋 이력 전체(settings 브랜치 포함)를 검사해 토큰·키가 올라간 적이 없음을 확인했다.
+- 커밋 작성자 이메일은 개인 메일 대신 GitHub noreply 주소(`kimdaehwan-coco@users.noreply.github.com`)를 쓴다.
 - 기간 필터는 각 사이트가 보여주는 날짜를 쓴다. 사람인은 수정된 공고면 수정일이 보이므로 수정일 기준이 된다 (결과의 '날짜구분' 열에 표시).
 - 직무 확인 단어 때문에 개발이 아닌 공고가 가끔 섞일 수 있다 (예: "연구개발 PL"). 그럴 때는 2.1의 단어나 2.3의 제외 단어를 고친다.

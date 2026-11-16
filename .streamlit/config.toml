@@ -1,8 +1,8 @@
 # findJob 화면 테마
-# 역할별 색: 남색 = 제목·구조 / 주황 = 눌러서 실행하는 핵심 동작 / 파랑 = 링크 / 붉은색 = 제외
+# 역할별 색: 남색 = 제목·구조 / 녹색 = 눌러서 실행하는 핵심 동작 / 파랑 = 링크 / 붉은색 = 제외
 [theme]
 base = "light"
-primaryColor = "#CF4500"
+primaryColor = "#15803D"
 backgroundColor = "#F3F5F8"
 secondaryBackgroundColor = "#FFFFFF"
 textColor = "#1A2233"

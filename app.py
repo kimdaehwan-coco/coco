@@ -73,7 +73,7 @@ def default_companies() -> list[str]:
 
 st.set_page_config(page_title="findJob · 채용공고 모아보기", layout="wide")
 # 색·글꼴 등 기본 테마는 .streamlit/config.toml, 여기서는 배치와 머리 영역만 다듬는다
-# 역할별 색: 남색(#14284B) 제목·구조 / 주황(#CF4500) 핵심 동작 / 파랑 링크 / 붉은색(#B42318) 제외
+# 역할별 색: 남색(#14284B) 제목·구조 / 녹색(#15803D) 핵심 동작 / 파랑 링크 / 붉은색(#B42318) 제외
 st.markdown("""
 <style>
 @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css');
@@ -100,7 +100,7 @@ st.markdown("""
 .st-key-search_card, .st-key-result_card { background: #FFFFFF; box-shadow: 0 1px 3px rgba(20,40,75,0.08); }
 /* 숫자 카드 */
 [data-testid='stMetricValue'] { color: #14284B; font-weight: 800; font-variant-numeric: tabular-nums; }
-/* 선택된 칩(직무·지역 등)은 남색 톱으로: 주황은 눌러서 실행하는 버튼에만 쓴다 */
+/* 선택된 칩(직무·지역 등)은 남회색으로: 녹색은 눌러서 실행하는 버튼에만 쓴다 */
 [data-tag] { background-color: #E3E8F1 !important; color: #14284B !important; }
 [data-tag] * { color: #14284B !important; fill: #14284B !important; }
 /* 제외 관련 버튼은 붉은 글씨로 구분 */
@@ -363,7 +363,7 @@ def go_page(n: int) -> None:
 # 그 쪽으로 돌아오면 selection_default 로 체크칸을 다시 채운다.
 # table_ver: 결과에서 공고를 빼면 올려서 표를 새로 만든다 (브라우저에 남은 체크 표시까지 지우려고)
 TABLE_KEY = f"result_table_{st.session_state.get('table_ver', 0)}_{page}"
-SELECTED_STYLE = "background-color: #FFE8CC; color: #1A2233; font-weight: 600"
+SELECTED_STYLE = "background-color: #DDF3E4; color: #1A2233; font-weight: 600"
 store: set[int] = st.session_state.setdefault("selected_ids", set())
 
 
@@ -477,7 +477,7 @@ with st.container(border=True, key="result_card"):
         # 선택한 카드는 표의 선택 줄과 같은 노란색 배경
         if selected_rows:
             css = ", ".join(f".st-key-card_{i}" for i in selected_rows)
-            st.markdown(f"<style>{css} {{ background: #FFE8CC; }}</style>", unsafe_allow_html=True)
+            st.markdown(f"<style>{css} {{ background: #DDF3E4; }}</style>", unsafe_allow_html=True)
         for idx, row in page_view.iterrows():
             with st.container(border=True, key=f"card_{idx}"):
                 st.markdown(card_html(row), unsafe_allow_html=True)

@@ -444,7 +444,7 @@ def card_html(row: pd.Series) -> str:
 with st.container(border=True, key="result_card"):
     # 구역 제목 + 보기 방식 + 오른쪽에 다운로드 버튼 (휴대폰에서는 위아래로 쌓인다)
     h1, h0, h2, h3 = st.columns([5, 1.6, 1.3, 1.3], vertical_alignment="center")
-    mode = h0.segmented_control("보기", ["표", "카드"], default="카드" if IS_MOBILE else "표",
+    mode = h0.segmented_control("보기", ["표", "카드"], default="카드",
                                 key="view_mode", label_visibility="collapsed", required=True)
     with h1:
         hint = ("왼쪽 체크칸으로 줄 선택 · 잘린 글자는 칸을 누르면 전체가 보입니다" if mode == "표"

@@ -104,15 +104,15 @@ st.markdown("""
 /* 선택된 칩(직무·지역 등)은 남회색으로: 녹색은 눌러서 실행하는 버튼에만 쓴다 */
 [data-tag] { background-color: #E3E8F1 !important; color: #14284B !important; }
 [data-tag] * { color: #14284B !important; fill: #14284B !important; }
-/* 검색 조건 칩은 항목마다 색을 달리해 한눈에 구분: 지역 주황 / 고용형태 보라 / 직무 파랑 / 사이트 분홍 */
+/* 검색 조건 칩은 항목마다 색을 달리해 한눈에 구분: 지역 주황 / 고용형태 보라 / 직무 파랑 / 사이트 초록 */
 .st-key-f_regions [data-tag] { background-color: #FFE4CC !important; }
 .st-key-f_regions [data-tag], .st-key-f_regions [data-tag] * { color: #9A3A00 !important; fill: #9A3A00 !important; }
 .st-key-f_emps [data-tag] { background-color: #EBDDFB !important; }
 .st-key-f_emps [data-tag], .st-key-f_emps [data-tag] * { color: #5A2A99 !important; fill: #5A2A99 !important; }
 .st-key-f_jobs [data-tag] { background-color: #D3E3FF !important; }
 .st-key-f_jobs [data-tag], .st-key-f_jobs [data-tag] * { color: #0B3A8C !important; fill: #0B3A8C !important; }
-.st-key-f_sites [data-tag] { background-color: #FCE1EC !important; }
-.st-key-f_sites [data-tag], .st-key-f_sites [data-tag] * { color: #A3194F !important; fill: #A3194F !important; }
+.st-key-f_sites [data-tag] { background-color: #D4F1DC !important; }
+.st-key-f_sites [data-tag], .st-key-f_sites [data-tag] * { color: #14602F !important; fill: #14602F !important; }
 /* 제외 관련 버튼은 붉은 글씨로 구분 */
 [class*='st-key-exc_'] button { color: #B42318; border-color: #E8C4BF; }
 [class*='st-key-exc_'] button:hover:not(:disabled) { color: #912018; border-color: #B42318; background: #FEF3F2; }

@@ -141,7 +141,7 @@
   - 흰 글씨와 녹색의 대비는 약 5:1이다.
   - 주색은 `.streamlit/config.toml`의 `primaryColor`, 칩·제외 버튼 색은 `app.py` 위쪽 CSS에서 바꾼다.
 - **글꼴**: Pretendard 한 가지를 굵기로만 구분한다. `app.py` CSS 맨 위의 `@import`로 CDN(jsdelivr)에서 불러오고, 못 불러오면 맑은 고딕 → Apple SD Gothic Neo 순으로 대체된다.
-  - **글자 크기**: 기본 16px(`config.toml`의 `baseFontSize`, 이전 14px)이고, 제목·카드·배지 등 `app.py` CSS의 개별 크기도 함께 키웠다. 표 줄 높이는 40px(`row_height`)이다. 더 키우거나 줄이려면 `baseFontSize`와 CSS의 `rem` 값을 같이 조정한다.
+  - **글자 크기**: 기본 18px(`config.toml`의 `baseFontSize`, 이전 14px)이고, 제목·카드·배지 등 `app.py` CSS의 개별 크기도 함께 키웠다. 표 줄 높이는 44px(`row_height`)이고, 결과 제목 줄의 버튼 칸 너비는 `st.columns([3.6, 1.6, 1.9, 1.7])`이다(글자를 키우면 엑셀 버튼 글자가 잘려서 넓힘). 더 키우거나 줄이려면 `baseFontSize`와 CSS의 `rem` 값을 같이 조정한다.
   - 버튼 아이콘 글꼴을 덮어쓰지 않도록 `font-family`를 CSS로 따로 지정하지 않고 테마(`config.toml`)의 `font`만 쓴다. 지정하면 아이콘이 `block`·`download` 같은 글자로 보인다.
 - **화면 배치** (`app.py` 위쪽 CSS):
   - 남색 단색 제목 띠를 둔다 (그라데이션 없음). 사이트 3곳은 흰 테두리 알약으로 표시한다.

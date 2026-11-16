@@ -88,15 +88,15 @@ st.markdown("""
   background: #14284B;
   color: #fff; border-radius: 0.8rem; padding: 1.1rem 1.4rem; margin-bottom: 0.4rem;
 }
-.fj-hero h1 { color: #fff; font-size: 1.75rem; font-weight: 800; letter-spacing: -0.02em; margin: 0; padding: 0; }
-.fj-hero p  { color: #C9D3E6; font-size: 1rem; margin: 0.3rem 0 0 0; }
+.fj-hero h1 { color: #fff; font-size: 1.95rem; font-weight: 800; letter-spacing: -0.02em; margin: 0; padding: 0; }
+.fj-hero p  { color: #C9D3E6; font-size: 1.1rem; margin: 0.3rem 0 0 0; }
 .fj-hero .fj-site {
   display: inline-block; border: 1px solid rgba(255,255,255,0.4); border-radius: 999px;
-  padding: 0.05rem 0.6rem; margin-right: 0.3rem; font-size: 0.9rem; color: #fff;
+  padding: 0.05rem 0.6rem; margin-right: 0.3rem; font-size: 1rem; color: #fff;
 }
 /* 구역 제목 */
-.fj-section { font-size: 1.15rem; font-weight: 700; color: #14284B; margin: 0.1rem 0 0.2rem 0; }
-.fj-section span { font-size: 0.92rem; font-weight: 400; color: #5F6B7E; margin-left: 0.5rem; }
+.fj-section { font-size: 1.3rem; font-weight: 700; color: #14284B; margin: 0.1rem 0 0.2rem 0; }
+.fj-section span { font-size: 1.02rem; font-weight: 400; color: #5F6B7E; margin-left: 0.5rem; }
 /* 검색 조건·결과 상자는 흰 카드처럼 */
 .st-key-search_card, .st-key-result_card { background: #FFFFFF; box-shadow: 0 1px 3px rgba(20,40,75,0.08); }
 /* 숫자 카드 */
@@ -117,20 +117,20 @@ st.markdown("""
 [class*='st-key-exc_'] button { color: #B42318; border-color: #E8C4BF; }
 [class*='st-key-exc_'] button:hover:not(:disabled) { color: #912018; border-color: #B42318; background: #FEF3F2; }
 /* 휴대폰 카드 보기의 공고 한 건 */
-.fj-card-title { font-weight: 700; font-size: 1.1rem; line-height: 1.35; }
+.fj-card-title { font-weight: 700; font-size: 1.25rem; line-height: 1.35; }
 .fj-card-title a { color: #1E5BB8; text-decoration: none; }
-.fj-card-meta { color: #4B5563; font-size: 0.95rem; line-height: 1.5; margin-top: 0.15rem; }
+.fj-card-meta { color: #4B5563; font-size: 1.05rem; line-height: 1.5; margin-top: 0.15rem; }
 .fj-card-meta b { color: #1A2233; font-weight: 600; }
 .fj-badge {
   display: inline-block; background: #E3E8F1; color: #14284B; border-radius: 999px;
-  padding: 0 0.5rem; font-size: 0.85rem; margin-right: 0.25rem;
+  padding: 0 0.5rem; font-size: 0.95rem; margin-right: 0.25rem;
 }
 /* 좁은 화면(휴대폰)에서는 여백·머리 글자를 줄인다 */
 @media (max-width: 640px) {
   .block-container, [data-testid='stMainBlockContainer'] { padding: 0.8rem 0.6rem 2rem 0.6rem; }
   .fj-hero { padding: 0.8rem 1rem; }
-  .fj-hero h1 { font-size: 1.35rem; }
-  .fj-hero p { font-size: 0.9rem; }
+  .fj-hero h1 { font-size: 1.3rem; }
+  .fj-hero p { font-size: 0.95rem; }
   .fj-section span { display: block; margin-left: 0; }
   .st-key-pager button { min-width: 2.1rem; padding: 0 0.45rem; }
 }
@@ -477,7 +477,7 @@ def card_html(row: pd.Series) -> str:
 
 with st.container(border=True, key="result_card"):
     # 구역 제목 + 보기 방식 + 오른쪽에 다운로드 버튼 (휴대폰에서는 위아래로 쌓인다)
-    h1, h0, h2, h3 = st.columns([5, 1.6, 1.3, 1.3], vertical_alignment="center")
+    h1, h0, h2, h3 = st.columns([3.6, 1.6, 1.9, 1.7], vertical_alignment="center")
     mode = h0.segmented_control("보기", ["표", "카드"], default="카드",
                                 key="view_mode", label_visibility="collapsed", required=True)
     with h1:
@@ -502,8 +502,8 @@ with st.container(border=True, key="result_card"):
     if mode == "표":
         styled = page_view.style.apply(lambda r: [SELECTED_STYLE if r.name in selected_rows else ""] * len(r), axis=1)
         st.dataframe(
-            styled, width="stretch", hide_index=True, key=TABLE_KEY, row_height=40,
-            height=(len(page_view) + 1) * 40 + 3,  # 줄 수에 맞춘 높이 (세로 스크롤 없음)
+            styled, width="stretch", hide_index=True, key=TABLE_KEY, row_height=44,
+            height=(len(page_view) + 1) * 44 + 3,  # 줄 수에 맞춘 높이 (세로 스크롤 없음)
             on_select=on_table_select, selection_mode="multi-row", column_config=column_config,
             selection_default={"selection": {"rows": sorted(i - start for i in selected_rows)}},
         )
@@ -534,6 +534,6 @@ with st.container(border=True, key="result_card"):
             for label, target, disabled in nav:
                 st.button(label, key=f"pg_{label}_{target}", on_click=go_page, args=(target,), disabled=disabled,
                           type="primary" if label == str(page) else "secondary")
-        st.markdown(f"<div style='text-align:center;color:#5F6B7E;font-size:0.92rem'>"
+        st.markdown(f"<div style='text-align:center;color:#5F6B7E;font-size:1.02rem'>"
                     f"{page} / {total_pages}쪽 · {start + 1}–{start + len(page_view)}번째 공고</div>",
                     unsafe_allow_html=True)

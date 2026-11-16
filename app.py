@@ -97,6 +97,8 @@ st.markdown("""
 /* 구역 제목 */
 .fj-section { font-size: 1.3rem; font-weight: 700; color: #14284B; margin: 0.1rem 0 0.2rem 0; }
 .fj-section span { font-size: 1.02rem; font-weight: 400; color: #5F6B7E; margin-left: 0.5rem; }
+/* 한글이 낱말 중간에서 줄바꿈되지 않도록 (글자를 키우면 '선/택'처럼 끊김) */
+.fj-hero, .fj-section, .fj-card-meta, .fj-card-title, [data-testid='stMarkdownContainer'], [data-testid='stCaptionContainer'] { word-break: keep-all; overflow-wrap: anywhere; }
 /* 검색 조건·결과 상자는 흰 카드처럼 */
 .st-key-search_card, .st-key-result_card { background: #FFFFFF; box-shadow: 0 1px 3px rgba(20,40,75,0.08); }
 /* 숫자 카드 */

@@ -73,8 +73,10 @@ def default_companies() -> list[str]:
 
 st.set_page_config(page_title="findJob · 채용공고 모아보기", layout="wide")
 # 색·글꼴 등 기본 테마는 .streamlit/config.toml, 여기서는 배치와 머리 영역만 다듬는다
+# 역할별 색: 남색(#14284B) 제목·구조 / 주황(#CF4500) 핵심 동작 / 파랑 링크 / 붉은색(#B42318) 제외
 st.markdown("""
 <style>
+@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css');
 /* 좌우 여백을 줄여 결과 표에 쓸 폭을 넓힌다 (가로 스크롤 방지), 위 여백도 줄인다 */
 .block-container, [data-testid='stMainBlockContainer'] {
   padding: 1.6rem 1.5rem 3rem 1.5rem; max-width: 100%;
@@ -82,29 +84,35 @@ st.markdown("""
 [data-testid='stHeader'] { background: transparent; }
 /* 머리 영역 */
 .fj-hero {
-  background: linear-gradient(120deg, #1F3864 0%, #2F5597 100%);
+  background: #14284B;
   color: #fff; border-radius: 0.8rem; padding: 1.1rem 1.4rem; margin-bottom: 0.4rem;
 }
-.fj-hero h1 { color: #fff; font-size: 1.55rem; font-weight: 700; margin: 0; padding: 0; }
-.fj-hero p  { color: #D6E0F5; font-size: 0.9rem; margin: 0.3rem 0 0 0; }
+.fj-hero h1 { color: #fff; font-size: 1.55rem; font-weight: 800; letter-spacing: -0.02em; margin: 0; padding: 0; }
+.fj-hero p  { color: #C9D3E6; font-size: 0.9rem; margin: 0.3rem 0 0 0; }
 .fj-hero .fj-site {
-  display: inline-block; background: rgba(255,255,255,0.16); border-radius: 999px;
+  display: inline-block; border: 1px solid rgba(255,255,255,0.4); border-radius: 999px;
   padding: 0.05rem 0.6rem; margin-right: 0.3rem; font-size: 0.8rem; color: #fff;
 }
 /* 구역 제목 */
-.fj-section { font-size: 1.02rem; font-weight: 700; color: #1F3864; margin: 0.1rem 0 0.2rem 0; }
-.fj-section span { font-size: 0.82rem; font-weight: 400; color: #6B7280; margin-left: 0.5rem; }
+.fj-section { font-size: 1.02rem; font-weight: 700; color: #14284B; margin: 0.1rem 0 0.2rem 0; }
+.fj-section span { font-size: 0.82rem; font-weight: 400; color: #5F6B7E; margin-left: 0.5rem; }
 /* 검색 조건·결과 상자는 흰 카드처럼 */
-.st-key-search_card, .st-key-result_card { background: #FFFFFF; box-shadow: 0 1px 3px rgba(31,56,100,0.06); }
+.st-key-search_card, .st-key-result_card { background: #FFFFFF; box-shadow: 0 1px 3px rgba(20,40,75,0.08); }
 /* 숫자 카드 */
-[data-testid='stMetricValue'] { color: #1F3864; font-weight: 700; }
+[data-testid='stMetricValue'] { color: #14284B; font-weight: 800; font-variant-numeric: tabular-nums; }
+/* 선택된 칩(직무·지역 등)은 남색 톱으로: 주황은 눌러서 실행하는 버튼에만 쓴다 */
+[data-tag] { background-color: #E3E8F1 !important; color: #14284B !important; }
+[data-tag] * { color: #14284B !important; fill: #14284B !important; }
+/* 제외 관련 버튼은 붉은 글씨로 구분 */
+[class*='st-key-exc_'] button { color: #B42318; border-color: #E8C4BF; }
+[class*='st-key-exc_'] button:hover:not(:disabled) { color: #912018; border-color: #B42318; background: #FEF3F2; }
 /* 휴대폰 카드 보기의 공고 한 건 */
 .fj-card-title { font-weight: 700; font-size: 0.98rem; line-height: 1.35; }
-.fj-card-title a { color: #1F3864; text-decoration: none; }
+.fj-card-title a { color: #1E5BB8; text-decoration: none; }
 .fj-card-meta { color: #4B5563; font-size: 0.84rem; line-height: 1.5; margin-top: 0.15rem; }
-.fj-card-meta b { color: #1F2937; font-weight: 600; }
+.fj-card-meta b { color: #1A2233; font-weight: 600; }
 .fj-badge {
-  display: inline-block; background: #EEF2F9; color: #2F5597; border-radius: 999px;
+  display: inline-block; background: #E3E8F1; color: #14284B; border-radius: 999px;
   padding: 0 0.5rem; font-size: 0.75rem; margin-right: 0.25rem;
 }
 /* 좁은 화면(휴대폰)에서는 여백·머리 글자를 줄인다 */
@@ -355,7 +363,7 @@ def go_page(n: int) -> None:
 # 그 쪽으로 돌아오면 selection_default 로 체크칸을 다시 채운다.
 # table_ver: 결과에서 공고를 빼면 올려서 표를 새로 만든다 (브라우저에 남은 체크 표시까지 지우려고)
 TABLE_KEY = f"result_table_{st.session_state.get('table_ver', 0)}_{page}"
-SELECTED_STYLE = "background-color: #FFE9A8; color: #1F2937; font-weight: 600"
+SELECTED_STYLE = "background-color: #FFE8CC; color: #1A2233; font-weight: 600"
 store: set[int] = st.session_state.setdefault("selected_ids", set())
 
 
@@ -469,7 +477,7 @@ with st.container(border=True, key="result_card"):
         # 선택한 카드는 표의 선택 줄과 같은 노란색 배경
         if selected_rows:
             css = ", ".join(f".st-key-card_{i}" for i in selected_rows)
-            st.markdown(f"<style>{css} {{ background: #FFE9A8; }}</style>", unsafe_allow_html=True)
+            st.markdown(f"<style>{css} {{ background: #FFE8CC; }}</style>", unsafe_allow_html=True)
         for idx, row in page_view.iterrows():
             with st.container(border=True, key=f"card_{idx}"):
                 st.markdown(card_html(row), unsafe_allow_html=True)
@@ -492,6 +500,6 @@ with st.container(border=True, key="result_card"):
             for label, target, disabled in nav:
                 st.button(label, key=f"pg_{label}_{target}", on_click=go_page, args=(target,), disabled=disabled,
                           type="primary" if label == str(page) else "secondary")
-        st.markdown(f"<div style='text-align:center;color:#6B7280;font-size:0.82rem'>"
+        st.markdown(f"<div style='text-align:center;color:#5F6B7E;font-size:0.82rem'>"
                     f"{page} / {total_pages}쪽 · {start + 1}–{start + len(page_view)}번째 공고</div>",
                     unsafe_allow_html=True)

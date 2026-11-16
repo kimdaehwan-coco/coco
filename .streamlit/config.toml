@@ -1,18 +1,19 @@
-# findJob 화면 테마 — 엑셀 파일과 같은 남색 계열로 맞춤
+# findJob 화면 테마
+# 역할별 색: 남색 = 제목·구조 / 주황 = 눌러서 실행하는 핵심 동작 / 파랑 = 링크 / 붉은색 = 제외
 [theme]
 base = "light"
-primaryColor = "#2F5597"
-backgroundColor = "#F4F6FA"
+primaryColor = "#CF4500"
+backgroundColor = "#F3F5F8"
 secondaryBackgroundColor = "#FFFFFF"
-textColor = "#1F2937"
-linkColor = "#2F5597"
-font = "'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif"
-headingFont = "'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif"
+textColor = "#1A2233"
+linkColor = "#1E5BB8"
+font = "Pretendard, 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif"
+headingFont = "Pretendard, 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif"
 baseFontSize = 14
 baseRadius = "0.6rem"
-borderColor = "#DDE3EE"
-dataframeBorderColor = "#E5E9F2"
-dataframeHeaderBackgroundColor = "#EEF2F9"
+borderColor = "#D5DBE6"
+dataframeBorderColor = "#DCE2EC"
+dataframeHeaderBackgroundColor = "#E3E8F1"
 showWidgetBorder = true
 
 [client]

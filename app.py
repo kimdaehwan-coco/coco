@@ -104,6 +104,15 @@ st.markdown("""
 /* 선택된 칩(직무·지역 등)은 남회색으로: 녹색은 눌러서 실행하는 버튼에만 쓴다 */
 [data-tag] { background-color: #E3E8F1 !important; color: #14284B !important; }
 [data-tag] * { color: #14284B !important; fill: #14284B !important; }
+/* 검색 조건 칩은 항목마다 색을 달리해 한눈에 구분: 지역 주황 / 고용형태 보라 / 직무 파랑 / 사이트 청록 */
+.st-key-f_regions [data-tag] { background-color: #FFE4CC !important; }
+.st-key-f_regions [data-tag], .st-key-f_regions [data-tag] * { color: #9A3A00 !important; fill: #9A3A00 !important; }
+.st-key-f_emps [data-tag] { background-color: #EBDDFB !important; }
+.st-key-f_emps [data-tag], .st-key-f_emps [data-tag] * { color: #5A2A99 !important; fill: #5A2A99 !important; }
+.st-key-f_jobs [data-tag] { background-color: #DCE6F7 !important; }
+.st-key-f_jobs [data-tag], .st-key-f_jobs [data-tag] * { color: #14284B !important; fill: #14284B !important; }
+.st-key-f_sites [data-tag] { background-color: #D2EEEC !important; }
+.st-key-f_sites [data-tag], .st-key-f_sites [data-tag] * { color: #0B5753 !important; fill: #0B5753 !important; }
 /* 제외 관련 버튼은 붉은 글씨로 구분 */
 [class*='st-key-exc_'] button { color: #B42318; border-color: #E8C4BF; }
 [class*='st-key-exc_'] button:hover:not(:disabled) { color: #912018; border-color: #B42318; background: #FEF3F2; }
@@ -257,16 +266,16 @@ with st.container(border=True, key="search_card"):
     date_from = c1.date_input("기간 FROM", value=today, format="YYYY-MM-DD",
                               help="공고 등록일 기준입니다. 사람인은 수정된 공고면 수정일 기준입니다.")
     date_to = c2.date_input("기간 TO", value=today, format="YYYY-MM-DD")
-    regions = c3.multiselect("지역", list(REGIONS), default=DEFAULT_REGIONS)
-    emps = c4.multiselect("고용형태", EMPLOYMENT_TYPES, default=EMPLOYMENT_TYPES)
+    regions = c3.multiselect("지역", list(REGIONS), default=DEFAULT_REGIONS, key="f_regions")
+    emps = c4.multiselect("고용형태", EMPLOYMENT_TYPES, default=EMPLOYMENT_TYPES, key="f_emps")
 
     # 2줄: 직무 · 사이트
     j1, j2 = st.columns([3, 2])
     jobs = j1.multiselect("직무",
-                          list(JOB_CATEGORIES), default=DEFAULT_JOB_CATEGORIES,
+                          list(JOB_CATEGORIES), default=DEFAULT_JOB_CATEGORIES, key="f_jobs",
                           help="목록을 펼치면 웹퍼블리셔·PHP·Node.js·웹기획자도 고를 수 있습니다. "
                                "직무를 많이 고를수록 검색이 오래 걸립니다.")
-    sites = j2.multiselect("검색 사이트", SITES, default=SITES)
+    sites = j2.multiselect("검색 사이트", SITES, default=SITES, key="f_sites")
 
     # 3줄: 제외 설정(팝업) · 페이지 수 · 검색 버튼
     # 제외 단어·업체는 자주 보는 정보가 아니라서 '제외 설정' 버튼 안에 넣고, 태그처럼 하나씩 넣고 빼게 한다.

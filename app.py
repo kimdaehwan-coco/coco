@@ -157,7 +157,7 @@ def section(title: str, note: str = "") -> None:
 #   클라우드 디스크는 앱이 다시 켜질 때마다 지워져서, 오래 보관하려면 GitHub 쪽을 써야 한다.
 # 저장소가 '진짜' 목록이다. 매 실행마다 저장소(20초 캐시)에서 읽어 세션에 맞춘다 → 다른 창에서 고친 것도 보인다.
 # 고칠 때는 목록 전체를 덮어쓰지 않고 '추가/삭제한 것'만 최신 내용에 반영한다 → 여러 창이 서로 지우지 않는다.
-# 태그 입력칸은 별도 키("…_w")를 쓴다. 입력칸 상태가 어떤 이유로 비어도 목록은 남아 있게 하기 위해서다.
+# 태그 입력칸은 별도 키("…_w<번호>")를 쓰고 값은 default= 로만 넘긴다 (session_state 로 직접 넣지 않는다 → _rebuild_widget 참고).
 def _secrets() -> tuple[dict, str]:
     """Secrets 에서 GITHUB_TOKEN/GITHUB_REPO 를 읽는다. 두 번째 값은 화면에 보여줄 상태(값은 절대 넣지 않음)."""
     try:
@@ -188,6 +188,19 @@ STORE_NAMES = {"ex_titles": "exclude_title_keywords", "ex_companies": "exclude_c
 DEFAULTS = {"ex_titles": default_titles, "ex_companies": default_companies}
 
 
+def _wkey(key: str) -> str:
+    """태그 입력칸의 키. 목록이 입력칸 밖에서 바뀌면 번호를 올려 입력칸을 새로 만든다."""
+    return f"{key}_w{st.session_state.get(f'{key}_ver', 0)}"
+
+
+def _rebuild_widget(key: str) -> None:
+    # 입력칸 값을 session_state 로 직접 밀어 넣으면 첫 실행에서만 화면에 반영되고, 다음 실행부터 화면은 비는데
+    # 서버 값은 그대로라서 어긋난다(2026-11-17 재현). 그 빈 화면에서 한 건만 넣으면 '나머지 전부 삭제'로 읽혀
+    # 저장소가 1개로 덮어써졌다(settings 브랜치 이력의 0개·1개 기록). 그래서 값은 default= 로만 넘기고,
+    # 바꿔야 할 때는 키 번호를 올려 입력칸을 새로 만든다.
+    st.session_state[f"{key}_ver"] = st.session_state.get(f"{key}_ver", 0) + 1
+
+
 @st.cache_data(ttl=20, show_spinner=False)
 def _load_saved(name: str, kind: str) -> list[str] | None:  # kind: 저장소가 바뀌면 캐시도 따로
     return STORE.load(name)
@@ -205,11 +218,15 @@ for _key, _name in STORE_NAMES.items():
         _latest = st.session_state[f"{_key}_unsaved"]
     if st.session_state.get(_key) != _latest:
         st.session_state[_key] = _latest
-        st.session_state[f"{_key}_w"] = list(_latest)
+        _rebuild_widget(_key)
 
 
-def _change(key: str, add: list[str] = (), remove: list[str] = (), replace: list[str] | None = None) -> None:
-    """저장소의 최신 목록에 추가/삭제(또는 통째 교체)를 반영하고 화면 값도 맞춘다."""
+def _change(key: str, add: list[str] = (), remove: list[str] = (), replace: list[str] | None = None,
+            sync_widget: bool = True) -> None:
+    """저장소의 최신 목록에 추가/삭제(또는 통째 교체)를 반영하고 화면 값도 맞춘다.
+
+    sync_widget: 입력칸을 새로 만들어 목록을 다시 보여줄지. 입력칸에서 직접 고친 경우(_on_tags)는 이미 화면에 보이므로 False.
+    """
     def fn(cur: list[str]) -> list[str]:
         return list(replace) if replace is not None else apply_change(cur, add, remove)
     try:
@@ -222,15 +239,21 @@ def _change(key: str, add: list[str] = (), remove: list[str] = (), replace: list
         st.session_state[f"{key}_unsaved"] = new
     _load_saved.clear()
     st.session_state[key] = new
-    st.session_state[f"{key}_w"] = list(new)
+    if sync_widget:
+        _rebuild_widget(key)
 
 
 def _on_tags(key: str) -> None:
-    if f"{key}_w" not in st.session_state:  # 입력칸 상태가 없는 실행(중단·재시작 직후)에는 '전부 삭제'로 착각하지 않는다
+    wkey = _wkey(key)
+    if wkey not in st.session_state:  # 입력칸 상태가 없는 실행(중단·재시작 직후)에는 '전부 삭제'로 착각하지 않는다
         return
-    old, new = st.session_state[key], st.session_state[f"{key}_w"]
+    old, new = st.session_state[key], st.session_state[wkey]
     old_n, new_n = {v.lower() for v in old}, {v.lower() for v in new}
-    _change(key, add=[v for v in new if v.lower() not in old_n], remove=[v for v in old if v.lower() not in new_n])
+    _change(key, add=[v for v in new if v.lower() not in old_n], remove=[v for v in old if v.lower() not in new_n],
+            sync_widget=False)
+    # 다른 창에서 고친 것과 합쳐져 화면과 달라졌으면 입력칸을 새로 만들어 맞춘다
+    if {v.lower() for v in st.session_state[key]} != new_n:
+        _rebuild_widget(key)
 
 
 def _add_bulk(key: str) -> None:
@@ -246,11 +269,8 @@ def _reset(key: str) -> None:
 
 def exclude_editor(key: str, label: str, help_text: str) -> None:
     # 태그 입력: 칸에 글자를 치고 Enter 로 하나씩 추가, 태그의 × 로 삭제
-    wkey = f"{key}_w"
-    if wkey not in st.session_state:
-        st.session_state[wkey] = list(st.session_state[key])
-    options = list(dict.fromkeys(st.session_state[key] + st.session_state[wkey]))
-    st.multiselect(label, options=options, key=wkey, accept_new_options=True,
+    current = list(st.session_state[key])
+    st.multiselect(label, options=current, default=current, key=_wkey(key), accept_new_options=True,
                    placeholder="입력 후 Enter 로 추가", help=help_text, on_change=_on_tags, args=(key,))
     st.text_input("여러 개 한 번에 추가", key=f"{key}_bulk", placeholder="쉼표로 구분해 붙여넣고 Enter",
                   on_change=_add_bulk, args=(key,), label_visibility="collapsed")

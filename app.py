@@ -334,11 +334,11 @@ if run:
     # 검색은 별도 스레드에서 돌린다. 검색 중에 조건을 건드리면 Streamlit 이 화면 스크립트를 중단하고 다시 실행하는데,
     # 검색을 스크립트 안에서 직접 돌리면 그때 결과가 통째로 사라진다. 스레드는 영향받지 않고, 다시 실행된 화면이 이어서 기다린다.
     if st.session_state.get("job") is None:
-        job = {"lines": [], "cond": cond, "result": None, "error": None}
+        job = {"cond": cond, "result": None, "error": None}
 
         def _work(j: dict = job) -> None:
             try:
-                j["result"] = run_search(j["cond"], log=j["lines"].append)
+                j["result"] = run_search(j["cond"])  # 진행 로그는 화면 대신 서버 콘솔에만 남는다
             except Exception as e:  # noqa: BLE001
                 j["error"] = f"{type(e).__name__}: {e}"
 
@@ -348,16 +348,16 @@ if run:
 
 _job = st.session_state.get("job")
 if _job is not None:
-    with st.status("검색 중… (조건을 바꿔도 검색은 계속됩니다)", expanded=True) as status:
-        box = st.empty()
+    searching = "검색 중… (조건을 바꿔도 검색은 계속됩니다)"
+    with st.status(searching) as status:
         while _job["thread"].is_alive():
-            box.code("\n".join(_job["lines"][-30:]) or "(로그 없음)")
+            # 기다리는 동안에도 화면 호출이 있어야 Streamlit 이 조건 변경(재실행)을 바로 처리한다
+            status.update(label=searching)
             time.sleep(0.7)
-        box.code("\n".join(_job["lines"]) or "(로그 없음)")
         if _job["error"]:
-            status.update(label="검색 실패", state="error", expanded=True)
+            status.update(label="검색 실패", state="error")
         else:
-            status.update(label=f"검색 완료: {len(_job['result'].postings)}건", state="complete", expanded=False)
+            status.update(label=f"검색 완료: {len(_job['result'].postings)}건", state="complete")
     st.session_state.pop("job", None)
     if _job["error"]:
         st.error(f"검색 중 오류가 났어요. {_job['error']}")

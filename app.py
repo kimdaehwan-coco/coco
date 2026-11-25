@@ -101,8 +101,21 @@ st.markdown("""
 .fj-hero, .fj-section, .fj-card-meta, .fj-card-title, [data-testid='stMarkdownContainer'], [data-testid='stCaptionContainer'] { word-break: keep-all; overflow-wrap: anywhere; }
 /* 검색 조건·결과 상자는 흰 카드처럼 */
 .st-key-search_card, .st-key-result_card { background: #FFFFFF; box-shadow: 0 1px 3px rgba(20,40,75,0.08); }
+/* 검색 진행 막대: 크고 눈에 띄게. 전체 쪽수를 미리 알 수 없어 퍼센트 대신 좌우로 흐르는 막대 */
+.fj-progress { border: 2px solid #15803D; background: #E8F6ED; border-radius: 0.8rem; padding: 1rem 1.2rem 1.15rem; }
+.fj-progress-label { color: #14602F; font-size: 1.2rem; font-weight: 700; margin-bottom: 0.7rem; }
+.fj-progress-track { position: relative; height: 1.2rem; background: #BFE5CB; border-radius: 999px; overflow: hidden; }
+.fj-progress-fill {
+  position: absolute; top: 0; bottom: 0; width: 40%; background: #15803D; border-radius: 999px;
+  animation: fj-slide 1.5s ease-in-out infinite;
+}
+@keyframes fj-slide { from { left: -40%; } to { left: 100%; } }
+.fj-done .fj-progress-fill, .fj-fail .fj-progress-fill { left: 0; width: 100%; animation: none; }
+.fj-fail { border-color: #B42318; background: #FEF3F2; }
+.fj-fail .fj-progress-label { color: #B42318; }
+.fj-fail .fj-progress-fill { background: #B42318; }
 /* 숫자 카드 */
-[data-testid='stMetricValue'] { color: #14284B; font-weight: 800; font-variant-numeric: tabular-nums; }
+[data-testid='stMetricValue'] { color: #14284B; font-size: 1.7rem; font-weight: 800; font-variant-numeric: tabular-nums; }
 /* 선택된 칩(직무·지역 등)은 남회색으로: 녹색은 눌러서 실행하는 버튼에만 쓴다 */
 [data-tag] { background-color: #E3E8F1 !important; color: #14284B !important; }
 [data-tag] * { color: #14284B !important; fill: #14284B !important; }
@@ -119,14 +132,18 @@ st.markdown("""
 [class*='st-key-exc_'] button { color: #B42318; border-color: #E8C4BF; }
 [class*='st-key-exc_'] button:hover:not(:disabled) { color: #912018; border-color: #B42318; background: #FEF3F2; }
 /* 휴대폰 카드 보기의 공고 한 건 */
-.fj-card-title { font-weight: 700; font-size: 1.25rem; line-height: 1.35; }
+.fj-card-title { font-weight: 700; font-size: 1.08rem; line-height: 1.35; }
 .fj-card-title a { color: #1E5BB8; text-decoration: none; }
-.fj-card-meta { color: #4B5563; font-size: 1.05rem; line-height: 1.5; margin-top: 0.15rem; }
+.fj-card-meta { color: #4B5563; font-size: 0.92rem; line-height: 1.5; margin-top: 0.15rem; }
 .fj-card-meta b { color: #1A2233; font-weight: 600; }
 .fj-badge {
   display: inline-block; background: #E3E8F1; color: #14284B; border-radius: 999px;
-  padding: 0 0.5rem; font-size: 0.95rem; margin-right: 0.25rem;
+  padding: 0 0.5rem; font-size: 0.83rem; margin-right: 0.25rem;
 }
+/* 카드 아래 '선택'·'제외 업체에 포함' 글자도 카드 본문 크기에 맞춘다 */
+[class*='st-key-card_'] button p, [class*='st-key-card_'] [data-testid='stCheckbox'] p { font-size: 0.92rem; }
+.st-key-result_card .fj-section { font-size: 1.15rem; }
+.st-key-result_card .fj-section span { font-size: 0.9rem; }
 /* 좁은 화면(휴대폰)에서는 여백·머리 글자를 줄인다 */
 @media (max-width: 640px) {
   .block-container, [data-testid='stMainBlockContainer'] { padding: 0.8rem 0.6rem 2rem 0.6rem; }
@@ -150,6 +167,13 @@ st.markdown("""
 
 def section(title: str, note: str = "") -> None:
     st.markdown(f'<div class="fj-section">{title}<span>{note}</span></div>', unsafe_allow_html=True)
+
+
+def show_progress(box, label: str, state: str = "run") -> None:
+    """검색 진행 막대. state: run(진행 중) / done(완료) / fail(실패)."""
+    box.markdown(f'<div class="fj-progress fj-{state}" role="status"><div class="fj-progress-label">{label}</div>'
+                 '<div class="fj-progress-track"><div class="fj-progress-fill"></div></div></div>',
+                 unsafe_allow_html=True)
 
 
 # ── 제외 단어·업체 ──
@@ -348,16 +372,15 @@ if run:
 
 _job = st.session_state.get("job")
 if _job is not None:
-    searching = "검색 중… (조건을 바꿔도 검색은 계속됩니다)"
-    with st.status(searching) as status:
-        while _job["thread"].is_alive():
-            # 기다리는 동안에도 화면 호출이 있어야 Streamlit 이 조건 변경(재실행)을 바로 처리한다
-            status.update(label=searching)
-            time.sleep(0.7)
-        if _job["error"]:
-            status.update(label="검색 실패", state="error")
-        else:
-            status.update(label=f"검색 완료: {len(_job['result'].postings)}건", state="complete")
+    box = st.empty()
+    while _job["thread"].is_alive():
+        # 기다리는 동안에도 화면 호출이 있어야 Streamlit 이 조건 변경(재실행)을 바로 처리한다
+        show_progress(box, "검색 중… (조건을 바꿔도 검색은 계속됩니다)")
+        time.sleep(0.7)
+    if _job["error"]:
+        show_progress(box, "검색 실패", "fail")
+    else:
+        show_progress(box, f"검색 완료: {len(_job['result'].postings)}건", "done")
     st.session_state.pop("job", None)
     if _job["error"]:
         st.error(f"검색 중 오류가 났어요. {_job['error']}")
